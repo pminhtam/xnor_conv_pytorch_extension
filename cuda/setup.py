@@ -1,5 +1,5 @@
 from setuptools import setup
-from torch.utils.cpp_extension import BuildExtension, CppExtension
+from torch.utils.cpp_extension import BuildExtension, CUDAExtension
 # import os
 # from distutils.sysconfig import get_config_vars
 # (opt,) = get_config_vars('OPT')
@@ -7,15 +7,16 @@ from torch.utils.cpp_extension import BuildExtension, CppExtension
 #     flag for flag in opt.split() if flag != '-Wstrict-prototypes'
 # )
 
-include_dirs = ['libpopcnt.h','matmul.h']
+# headers = ['libpopcnt.h','matmul.h']
+# ,'binop_cuda_kernel.cu'
 setup(
-    name='binary_cpp',
+    name='binary_cuda',
     version='0.1',
     author = 'pminhtam',
-    description = 'xnor cpp',
+    description = 'xnor cuda',
     ext_modules=[
-        CppExtension(name='binary_cpp',
-                     sources= ['binary.cpp']),
+        CUDAExtension(name='binary_cuda',
+                     sources= ['binary_cuda.cpp']),
     ],
     cmdclass={
         'build_ext': BuildExtension
