@@ -33,8 +33,8 @@ void encode_rows_cpu_kernel(float* columns, int* columns_binary, int k, int n) {
 
 torch::Tensor encode_rows_cpu(torch::Tensor input) {
 // chuyển float32 sang binary
-    int n = input.size(0);
-    int k = input.size(1);
+    int n = input.size(0);  // = h*w
+    int k = input.size(1);  // = c*k1*k2
     int l = 1+(k-1)/ENCODE_BIT;
 //    std::cout<< n << '\n';
 //    std::cout<< k << '\n';
@@ -51,39 +51,50 @@ torch::Tensor encode_rows_cpu(torch::Tensor input) {
     return output;
 }
 
-void binary_gemm_cpu(torch::Tensor a, torch::Tensor b, torch::Tensor c, int m, int nn, int k, int transb, int beta, int alpha, THFloatTensor* alphas){
+torch::Tensor binary_gemm_cpu(torch::Tensor a, torch::Tensor b, int c_out, int k, int n, int beta, int alpha,int l){
 //Tính a = a*b
 //Compute C <- beta*C + A*B, beta = 0 or 1
-    if (c->nDimension != 2 || c->size[0]*c->size[1] < m*k) {
-        THFloatTensor_resize2d(c, m, k);
-    }
-    uint32_t *A = (uint32_t*)THIntTensor_data(a);
-    uint32_t *B = (uint32_t*)THIntTensor_data(b);
-    float *C = THFloatTensor_data(c);
-    float *D = THFloatTensor_data(alphas);
-    int n = 1 + (nn-1) / ENCODE_BIT, brow = transb? 1:k, bcol = transb? n:1;
-    dgemm_nn(m, k, nn, A, n, 1, B, brow, bcol, C, k, 1, beta, alpha, D);
+//    if (c->nDimension != 2 || c->size[0]*c->size[1] < m*k) {
+//        THFloatTensor_resize2d(c, m, k);
+//    }
+    auto A = a.data_ptr<int>();
+    auto B = b.data_ptr<int>();
+    torch::Tensor c = torch::zeros(torch::IntArrayRef({c_out,n}),torch::TensorOptions().dtype(torch::kFloat));
+    torch::Tensor alphas = torch::ones(torch::IntArrayRef({c_out,n}),torch::TensorOptions().dtype(torch::kFloat));
+    auto C = c.data_ptr<float>();
+    auto D = alphas.data_ptr<float>();
+//    int l = 1 + (k-1) / ENCODE_BIT, brow = transb? 1:n, bcol = transb? l:1;
+//    dgemm_nn(c_out, n, k, A, l, 1, B, brow,s bcol, C, k, 1, beta, alpha, D);
+//    int a_s1 =  a.size(0);
+//    std::cout << a_s1<< '\n';
+//    std::cout << a.size(0)<< '\n';
+//    std::cout << a.size(1)<< '\n';
+//    dgemm_nn(c_out, n, k, A, l, 1, B, 1, l, C, k, 1, beta, alpha, D);   // wrong big
+//    dgemm_nn(c_out, n, k, A, l, 1, B, l, 1, C, k, 1, beta, alpha, D); // wrong big
+//    dgemm_nn(c_out, n, k, A, 1, l, B, 1, l, C, 1, k, beta, alpha, D); // wrong
+//    dgemm_nn(c_out, n, k, A, 1, l, B, l, 1, C, 1, k, beta, alpha, D); // wrong
+    dgemm_nn(c_out, n, k, A, l, 1, B, l, 1, C, 1, k, beta, alpha, D); // wrong
+    // ??????????
+    return c;
+
 }
 
 static torch::Tensor Bin_SpatialConvolutionMM_updateOutput_frame(
                                                              torch::Tensor weight,
                                                              torch::Tensor bias,
-                                                             torch::Tensor *bin_col,
-                                                             int kW, int kH,
-                                                             int dW, int dH,
-                                                             int padW, int padH,
+                                                             torch::Tensor bin_col,
+                                                             int c_in,int k1, int k2,
+                                                             int n, int c_out,int l
                                                              )
 {
-    THFloatTensor *output2d;
 
-    output2d = THFloatTensor_newWithStorage2d(output->storage, output->storageOffset, nOutputPlane, -1, outputHeight*outputWidth, -1);
-    THFloatTensor_zero(output2d);
 
-    binary_gemm_cpu(weight, bin_col, output2d, nOutputPlane, kW*kH*nInputPlane, outputHeight*outputWidth, 0, 1, 1, alphas);
-    if (bias->nDimension) {
-        THFloatTensor_addmm(output2d, 1, output2d, 1, bias, ones);
-    }
-    THFloatTensor_free(output2d);
+    torch::Tensor output2d = binary_gemm_cpu(weight, bin_col, c_out, c_in*k1*k2, n, 1, 1,l);
+//    if (bias->nDimension) {
+//        THFloatTensor_addmm(output2d, 1, output2d, 1, bias, ones);
+//    }
+//    THFloatTensor_free(output2d);
+    return output2d;
 }
 
 
@@ -115,13 +126,16 @@ torch::Tensor binary_conv2d(
 //    torch::Tensor col_pack = encode_rows_cpu(bin_col[0]);
         col_pack[idx] = encode_rows_cpu(bin_col[idx]);
     }
-    torch::Tensor out_tensor = torch::zeros_like(input);
+//    torch::Tensor out_tensor = torch::zeros_like(input);
+    torch::Tensor out_tensor = torch::zeros(torch::IntArrayRef({batch_size,c_out,n}));
 
 #pragma omp parallel for private(idx)
     for(idx = 0; idx < batch_size; idx++){
-        out_tensor[idx] = Bin_SpatialConvolutionMM_updateOutput_frame(bin_col[idx]);
+        out_tensor[idx] = Bin_SpatialConvolutionMM_updateOutput_frame(weights,bias,col_pack[idx],
+         c_in, k1,k2,n, c_out,l);
     }
-    return col_pack;
+//    return col_pack;
+    return out_tensor;
 //    return bin_col;
 //    return fil_2;
 }
