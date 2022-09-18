@@ -9,14 +9,14 @@
 
 #define MR  4
 #define NR  4
-#define ENCODE_BIT 32
+#define ENCODE_BIT 16
 #define MASK(a) ( (a) + ( -(a) & -((0)>(a)) ) )
 const uint32_t UBIT = ~0;
 //
 //  Local buffers for storing panels from A, B and C
 //
-static uint32_t _A[MC*KC];
-static uint32_t _B[KC*NC];
+static int _A[MC*KC];
+static int _B[KC*NC];
 
 static inline uint32_t popcnt32(uint32_t x)
 {
@@ -27,7 +27,7 @@ static inline uint32_t popcnt32(uint32_t x)
 //  Packing complete panels from A (i.e. without padding)
 //
 static void
-pack_MRxk(int k, uint32_t *A, int incRowA, int incColA, uint32_t *buffer){
+pack_MRxk(int k, int *A, int incRowA, int incColA, int *buffer){
     int i, j;
 
     for (j=0; j<k; ++j) {
@@ -43,7 +43,7 @@ pack_MRxk(int k, uint32_t *A, int incRowA, int incColA, uint32_t *buffer){
 //  Packing panels from A with padding if required
 //
 static void
-pack_A(int mc, int kc, uint32_t *A, int incRowA, int incColA, uint32_t *buffer){
+pack_A(int mc, int kc, int *A, int incRowA, int incColA, int *buffer){
     int i, j, mp  = mc / MR, _mr = mc % MR;
 
     for (i=0; i<mp; ++i) {
@@ -69,7 +69,7 @@ pack_A(int mc, int kc, uint32_t *A, int incRowA, int incColA, uint32_t *buffer){
 //  Packing complete panels from B (i.e. without padding)
 //
 static void
-pack_kxNR(int k, uint32_t *B, int incRowB, int incColB, uint32_t *buffer){
+pack_kxNR(int k, int *B, int incRowB, int incColB, int *buffer){
     int i, j;
 
     for (i=0; i<k; ++i) {
@@ -85,7 +85,7 @@ pack_kxNR(int k, uint32_t *B, int incRowB, int incColB, uint32_t *buffer){
 //  Packing panels from B with padding if required
 //
 static void
-pack_B(int kc, int nc, uint32_t *B, int incRowB, int incColB, uint32_t *buffer){
+pack_B(int kc, int nc, int *B, int incRowB, int incColB, int *buffer){
     int i, j, np  = nc / NR, _nr = nc % NR;
 
     for (j=0; j<np; ++j) {
@@ -112,7 +112,7 @@ pack_B(int kc, int nc, uint32_t *B, int incRowB, int incColB, uint32_t *buffer){
 //  Micro kernel for multiplying panels from A and B.
 //
 static void
-dgemm_micro_kernel(int m, int n, int kc, uint32_t *A, uint32_t *B, int beta, float *C, int incRowC, int incColC)
+dgemm_micro_kernel(int m, int n, int kc, int *A, int *B, int beta, float *C, int incRowC, int incColC)
 {
     int AB[MR*NR];
     int i, j, l;
@@ -229,10 +229,10 @@ void
 dgemm_nn(int            m,
          int            n,
          int            kk,
-         uint32_t      *A,
+         int      *A,
          int            incRowA,
          int            incColA,
-         uint32_t      *B,
+         int      *B,
          int            incRowB,
          int            incColB,
          float         *C,
