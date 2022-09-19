@@ -16,7 +16,7 @@ setup(
     description = 'xnor cuda',
     ext_modules=[
         CUDAExtension(name='binary_cuda',
-                     sources= ['binary_cuda.cpp']),
+                     sources= ['binary_cuda.cpp','binop_cuda_kernel.cu']),
     ],
     cmdclass={
         'build_ext': BuildExtension
