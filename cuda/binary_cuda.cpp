@@ -4,13 +4,9 @@
 //#include <iostream>
 //#include <cuda.h>
 //#include <cuda_runtime.h>
-#include "binop_cuda_kernel.cu"
+// #include "binop_cuda_kernel.cu"
 
-torch::Tensor binary_conv2d(
-    torch::Tensor input,
-    torch::Tensor weights,
-    torch::Tensor bias
-    );
+torch::Tensor encode_rows(torch::Tensor input);
 // NOTE: AT_ASSERT has become AT_CHECK on master after 0.4.
 #define CHECK_CUDA(x) AT_ASSERTM(x.type().is_cuda(), #x " must be a CUDA tensor")
 #define CHECK_CONTIGUOUS(x) AT_ASSERTM(x.is_contiguous(), #x " must be contiguous")
@@ -30,6 +26,7 @@ torch::Tensor binary_conv2d(
     const int batch_size = input.size(0), c = input.size(1), h = input.size(2), w = input.size(3);
     const int c_out = weights.size(0), c_in = weights.size(1), k1 = weights.size(2), k2 = weights.size(3);
 //    auto X = 2*input;
+    // auto input2 = input.to(torch::kFloat32);
     torch::Tensor col_mat = torch::im2col(input,/*kernel_size=*/torch::IntArrayRef({3, 3}),
                                                  /*dilation=*/torch::IntArrayRef({1, 1}),
                                                  /*padding=*/torch::IntArrayRef({0, 0}),
@@ -42,15 +39,19 @@ torch::Tensor binary_conv2d(
 
     int n = bin_col.size(1);
     int k = bin_col.size(2);
-    int l = 1+(k-1)/32; // ENCODE_BITS 32
+    int l = 1+(k-1)/16; // ENCODE_BITS 32
     int idx;
     torch::Tensor col_pack = torch::zeros(torch::IntArrayRef({batch_size,n,l}),torch::TensorOptions()
-                    .dtype(torch::kInt32).device(torch::kCUDA, 0));
-
-//    for(idx = 0; idx < batch_size; idx++){
+                    .dtype(torch::kInt32));
+    // torch::Tensor col_pack = torch::zeros(torch::IntArrayRef({batch_size,n,l}));
+    // std::cout<< "zzzzzzzzzzzzzzz " << '\n';
+   for(idx = 0; idx < batch_size; idx++){
 //    torch::Tensor col_pack = encode_rows_cpu(bin_col[0]);
-//        col_pack[idx] = encode_rows(bin_col[idx]);
-//    }
+       col_pack[idx] = encode_rows(bin_col[idx]);
+      //  std::cout << idx ;
+      // std::cout << idx << col_pack[idx] << '\n' ;
+
+   }
     return  col_pack;
 
 }
