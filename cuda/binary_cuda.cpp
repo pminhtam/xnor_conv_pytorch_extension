@@ -7,6 +7,9 @@
 // #include "binop_cuda_kernel.cu"
 
 torch::Tensor encode_rows(torch::Tensor input);
+
+torch::Tensor binary_gemm(torch::Tensor weight, torch::Tensor columns_binary, int m, int nn, int k, int transb, int alpha, int beta);
+
 // NOTE: AT_ASSERT has become AT_CHECK on master after 0.4.
 #define CHECK_CUDA(x) AT_ASSERTM(x.type().is_cuda(), #x " must be a CUDA tensor")
 #define CHECK_CONTIGUOUS(x) AT_ASSERTM(x.is_contiguous(), #x " must be contiguous")
@@ -43,16 +46,19 @@ torch::Tensor binary_conv2d(
     int idx;
     torch::Tensor col_pack = torch::zeros(torch::IntArrayRef({batch_size,n,l}),torch::TensorOptions()
                     .dtype(torch::kInt32));
+    torch::Tensor out_tensor = torch::zeros(torch::IntArrayRef({batch_size,c_out,n}));
+
     // torch::Tensor col_pack = torch::zeros(torch::IntArrayRef({batch_size,n,l}));
     // std::cout<< "zzzzzzzzzzzzzzz " << '\n';
    for(idx = 0; idx < batch_size; idx++){
 //    torch::Tensor col_pack = encode_rows_cpu(bin_col[0]);
        col_pack[idx] = encode_rows(bin_col[idx]);
+       out_tensor[idx] = binary_gemm(weights, col_pack[idx], c_out,k,n,0,1,1);
       //  std::cout << idx ;
       // std::cout << idx << col_pack[idx] << '\n' ;
 
    }
-    return  col_pack;
+    return  out_tensor;
 
 }
 
