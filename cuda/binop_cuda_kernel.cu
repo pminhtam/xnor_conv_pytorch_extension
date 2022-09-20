@@ -87,8 +87,10 @@ __global__ void binary_gemm_kernel(
       // auto b_element = b[n_local][idx_int_num_local];
     // c[c_channel][idx_int_num_local][n_local] = 1;
 // c[c_channel][idx_int_num_local][n_local] = b[0][0];
-c[c_channel][idx_int_num_local][n_local] = b[n_local][idx_int_num_local];
-// c[c_channel][idx_int_num_local][n_local] = __popc(a[c_channel][idx_int_num_local]^b[n_local][idx_int_num_local]);
+// c[c_channel][idx_int_num_local][n_local] = b[n_local][idx_int_num_local];
+c[c_channel][idx_int_num_local][n_local] = __popc( (unsigned int) a[c_channel][idx_int_num_local]^ (unsigned int) b[n_local][idx_int_num_local]);
+// c[c_channel][idx_int_num_local][n_local] = __popc(12344);
+
 // auto rere = __popc(a[c_channel][idx_int_num_local]^b[n_local][idx_int_num_local]);
 
     // for (idx = 0; idx<c_out; idx++){
