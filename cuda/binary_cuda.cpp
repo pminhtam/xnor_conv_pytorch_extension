@@ -5,6 +5,7 @@
 //#include <cuda.h>
 //#include <cuda_runtime.h>
 // #include "binop_cuda_kernel.cu"
+#define ENCODE_BITS 16
 
 torch::Tensor encode_rows(torch::Tensor input);
 
@@ -42,7 +43,7 @@ torch::Tensor binary_conv2d(
 
     int n = bin_col.size(1);
     int k = bin_col.size(2);
-    int l = 1+(k-1)/16; // ENCODE_BITS 32
+    int l = 1+(k-1)/ENCODE_BITS; // ENCODE_BITS 32
     int idx;
     torch::Tensor col_pack = torch::zeros(torch::IntArrayRef({batch_size,n,l}),torch::TensorOptions()
                     .dtype(torch::kInt32).device(torch::kCUDA, 0));
