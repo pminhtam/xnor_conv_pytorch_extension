@@ -71,7 +71,7 @@ __global__ void binary_gemm_kernel(
         const torch::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> a,
         const torch::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> b,
         torch::PackedTensorAccessor32<scalar_t,3,torch::RestrictPtrTraits> c,
-        int c_out , int l, int n) {
+        int c_out , int l,int k, int n) {
         // ta se tính theo  b (tức data ) n =
         // a : filter : = (c_out, num_int): = (c_out, c_in*k1*k2)
         // b : data : = (n , num_int) = (n, c_in*k1*k2)
@@ -88,7 +88,7 @@ __global__ void binary_gemm_kernel(
     // c[c_channel][idx_int_num_local][n_local] = 1;
 // c[c_channel][idx_int_num_local][n_local] = b[0][0];
 // c[c_channel][idx_int_num_local][n_local] = b[n_local][idx_int_num_local];
-c[c_channel][idx_int_num_local][n_local] = __popc( (unsigned int) a[c_channel][idx_int_num_local]^ (unsigned int) b[n_local][idx_int_num_local]);
+c[c_channel][idx_int_num_local][n_local] = 2*__popc( (unsigned int) a[c_channel][idx_int_num_local]^ (unsigned int) b[n_local][idx_int_num_local])-k;
 // c[c_channel][idx_int_num_local][n_local] = __popc(12344);
 
 // auto rere = __popc(a[c_channel][idx_int_num_local]^b[n_local][idx_int_num_local]);
@@ -110,7 +110,7 @@ c[c_channel][idx_int_num_local][n_local] = __popc( (unsigned int) a[c_channel][i
   }
 }
 
-torch::Tensor binary_gemm(torch::Tensor a, torch::Tensor b,  int c_out, int l, int n, int transb, int alpha, int beta){
+torch::Tensor binary_gemm(torch::Tensor a, torch::Tensor b,  int c_out, int l, int k, int n, int transb, int alpha, int beta){
 
 //     b : columns_binary
 //     auto A = a.data_ptr<int>();
@@ -137,7 +137,7 @@ torch::Tensor binary_gemm(torch::Tensor a, torch::Tensor b,  int c_out, int l, i
      a.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
      b.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
      c.packed_accessor32<scalar_t,3,torch::RestrictPtrTraits>(),
-    c_out ,l, n
+    c_out ,l,k, n
     );
     }));
 //    return output;

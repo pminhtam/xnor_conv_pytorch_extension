@@ -18,8 +18,8 @@ tensor_col[img_pad <= 0] = 0
 tensor_fil[fil > 0] = 1
 tensor_fil[fil <= 0] = 0
 # tensor_col = tensor_col.type(torch.int)
-tensor_fil = tensor_fil.type(torch.int)
-bias = bias.type(torch.int)
+# tensor_fil = tensor_fil.type(torch.int)
+# bias = bias.type(torch.int)
 # print(bias)
 # re = binary_cpp.binary_conv2d(img_pad,fil,bias)
 re = binary_cuda.binary_conv2d_cuda(tensor_col,tensor_fil,bias)

@@ -9,7 +9,7 @@
 
 torch::Tensor encode_rows(torch::Tensor input);
 
-torch::Tensor binary_gemm(torch::Tensor a, torch::Tensor b,  int c_out, int k, int n, int transb, int alpha, int beta);
+torch::Tensor binary_gemm(torch::Tensor a, torch::Tensor b,  int c_out, int l, int k, int n, int transb, int alpha, int beta);
 
 // NOTE: AT_ASSERT has become AT_CHECK on master after 0.4.
 #define CHECK_CUDA(x) AT_ASSERTM(x.type().is_cuda(), #x " must be a CUDA tensor")
@@ -61,7 +61,7 @@ torch::Tensor binary_conv2d(
 //    torch::Tensor col_pack = encode_rows_cpu(bin_col[0]);
        col_pack[idx] = encode_rows(bin_col[idx]);
        std::cout << col_pack[idx].size(0) << "  ,   " << col_pack[idx].size(1) << '\n';
-       out_tensor[idx] = binary_gemm(fil_pack, col_pack[idx], c_out,l,n,0,1,1);
+       out_tensor[idx] = binary_gemm(fil_pack, col_pack[idx], c_out,l,k,n,0,1,1);
       //  std::cout << idx ;
       // std::cout << idx << col_pack[idx] << '\n' ;
 
