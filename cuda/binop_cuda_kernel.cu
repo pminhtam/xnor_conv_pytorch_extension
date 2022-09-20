@@ -67,79 +67,78 @@ torch::Tensor encode_rows(torch::Tensor input) {
 //     AT_DISPATCH_FLOATING_TYPES
 // }
 template <typename scalar_t>
-__global__ void binary_gemm_kernel(int* A, int* B, float* C, int m, int nn, int k, int transb, int alpha, int beta) {
-    int blockRow = blockIdx.y;
-    int blockCol = blockIdx.x;
+__global__ void binary_gemm_kernel(
+        const torch::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> a,
+        const torch::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> b,
+        torch::PackedTensorAccessor32<scalar_t,3,torch::RestrictPtrTraits> c,
+        int c_out , int l, int n) {
+        // ta se tính theo  b (tức data ) n =
+        // a : filter : = (c_out, num_int): = (c_out, c_in*k1*k2)
+        // b : data : = (n , num_int) = (n, c_in*k1*k2)
+        // c output := (c_out, n)
+  //batch index
+  const int n_local = threadIdx.x + blockIdx.x * blockDim.x;
+  // column index
+  const int idx_int_num_local = threadIdx.y;
+  const int c_channel =  blockIdx.y;
+    int idx = 0;
+  if (n_local < n & idx_int_num_local < l & c_channel < c_out){
+    //  b[idx_int_num_local][n_local] = 1;
+      // auto b_element = b[n_local][idx_int_num_local];
+    // c[c_channel][idx_int_num_local][n_local] = 1;
+// c[c_channel][idx_int_num_local][n_local] = b[0][0];
+c[c_channel][idx_int_num_local][n_local] = b[n_local][idx_int_num_local];
+// c[c_channel][idx_int_num_local][n_local] = __popc(a[c_channel][idx_int_num_local]^b[n_local][idx_int_num_local]);
+// auto rere = __popc(a[c_channel][idx_int_num_local]^b[n_local][idx_int_num_local]);
 
-    int row = threadIdx.y;
-    int col = threadIdx.x;
-
-	int n = 1 + (nn-1)/ENCODE_BITS;
-    int startLocation = BLOCK_SIZE * k * blockRow + BLOCK_SIZE * blockCol;
-
-    float* Csub = &C[BLOCK_SIZE * k * blockRow + BLOCK_SIZE * blockCol];
-
-    __shared__ int As[BLOCK_SIZE][BLOCK_SIZE];
-    __shared__ int Bs[BLOCK_SIZE][BLOCK_SIZE];
-
-    int Cvalue = 0;
-
-    int c = blockIdx.x*blockDim.x + threadIdx.x;
-    int r = blockIdx.y*blockDim.y + threadIdx.y;
-    int lim = 1+( (n-1) / BLOCK_SIZE);
-    for (int i = 0; i < lim; ++i) {
-
-        // Get sub-matrix Asub of A
-        int* Asub = &A[BLOCK_SIZE * blockRow * n + BLOCK_SIZE * i];
-
-        // Get sub-matrix Bsub of B
-        int* Bsub = transb? &B[BLOCK_SIZE * blockCol * n + BLOCK_SIZE * i] : &B[BLOCK_SIZE * k * i + BLOCK_SIZE * blockCol];
-
-        if ((BLOCK_SIZE*i+col)<n && r<m)
-            As[row][col] = Asub[row*n+col];
-        else
-            As[row][col] = 0;
-        if ((BLOCK_SIZE*i+row)<n && c<k)
-            Bs[row][col] = transb? Bsub[row+col*n] : Bsub[row*k+col];
-        else
-            Bs[row][col] = 0;
-
-        __syncthreads();
-        #pragma unroll
-        for (int j = 0; j < BLOCK_SIZE; ++j)
-            Cvalue += __popc(As[row][j]^Bs[j][col]);
-//             Hàm xnor ở đây
-        __syncthreads();
-    }
-// hiệu chỉnh lại giá trị xnor vì bit là [0,1] còn bnn là [-1,1 ]
-// Chỉ chọn vùng có giá trị, loại vùng thừa
-    if(col + blockCol* BLOCK_SIZE< k && row + blockRow* BLOCK_SIZE< m){
-		Csub[row*k+col] = beta ? Csub[row*k+col]:0;
-// 		Csub[row*k+col]+= alpha? (1.0*nn-(Cvalue<<1))*alphas[(startLocation+row*k+col)/k] : 1.0*nn-(Cvalue<<1);
-		Csub[row*k+col]+= alpha? (1.0*nn-(Cvalue<<1)) : 1.0*nn-(Cvalue<<1);
-	}
+    // for (idx = 0; idx<c_out; idx++){
+    //   const auto b_element = b[n_local][idx_int_num_local];
+    //     // c[idx][idx_int_num_local][n_local] = __popc(a[idx][idx_int_num_local]^b[n_local][idx_int_num_local]);
+    //       //  auto CC = __popc(a[idx][idx_int_num_local]^b[n_local][idx_int_num_local]);
+    //       // auto zz = a[idx][idx_int_num_local];
+    //       // auto zz = b[n_local][idx_int_num_local];
+    //       // a[idx][idx_int_num_local] = 1;
+    //       // b[idx_int_num_local][n_local] = 1;
+    //       // c[idx][idx_int_num_local][n_local] = 1;
+    //         // c[idx][idx_int_num_local][n_local] = a[idx][idx_int_num_local]+b[n_local][idx_int_num_local];
+    //         // c[idx][idx_int_num_local][n_local] = a[idx][idx_int_num_local];
+    //         // c[idx][idx_int_num_local][n_local] = b[n_local][idx_int_num_local];
+    //         c[idx][idx_int_num_local][n_local] = b_element;
+    // }
+  }
 }
 
-torch::Tensor binary_gemm(torch::Tensor a, torch::Tensor b,  int c_out, int k, int n, int transb, int alpha, int beta){
+torch::Tensor binary_gemm(torch::Tensor a, torch::Tensor b,  int c_out, int l, int n, int transb, int alpha, int beta){
 
-    torch::Tensor c = torch::zeros(torch::IntArrayRef({n,c_out}),torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCUDA, 0));
 //     b : columns_binary
-    auto A = a.data_ptr<int>();
-    auto B = b.data_ptr<int>();
-    auto C = c.data_ptr<float>();
+//     auto A = a.data_ptr<int>();
+//     auto B = b.data_ptr<int>();
+//     auto C = c.data_ptr<float>();
 
-//     float *D = alpha? THCudaTensor_data(state, alphas) : NULL;
+//     float *D = alpha? THCudaTensor_data(state, alphas) : NULL;s
 //     cudaStream_t stream = THCState_getCurrentStream(state);
-
+//  k số hàng
+// n số cột
 //     binary_gemm_cuda(A, B, C, c_out, k, n, transb, alpha, beta);
-    dim3 blockDim(ENCODE_BITS, ENCODE_BITS, 1);
-    dim3 gridDim(k/ENCODE_BITS+1, n/ENCODE_BITS+1, 1);
-
-    AT_DISPATCH_FLOATING_TYPES(c.type(), "binary_gemm", ([&] {
-    binary_gemm_kernel<scalar_t><<<gridDim, blockDim>>>(
-     A, B, C, c_out, k, n, 0, 1, 1
+//     dim3 blockDim(BLOCK_DIM, BLOCK_DIM);
+//     dim3 gridDim(k/ENCODE_BITS+1, n/ENCODE_BITS+1, 1);
+    // const int kk = 1+(k-1)/ENCODE_BITS;
+    // const int threads = 1024;
+    const dim3 threads(256, l/1+1);
+    const dim3 blocks(n/256+1, c_out);
+    torch::Tensor c = torch::zeros(torch::IntArrayRef({c_out,l,n}),torch::TensorOptions().dtype(torch::kInt32).device(torch::kCUDA, 0));
+    // std::cout << b.size(0) << "  ,   " << b.size(1) << '\n';
+    // std::cout << "b[0][0] : " << b[0][0] << '\n';
+    // std::cout << "a[0][0] : " << a[0][0] << '\n';
+    AT_DISPATCH_ALL_TYPES(b.type(), "binary_gemm", ([&] {
+    binary_gemm_kernel<scalar_t><<<blocks, threads>>>(
+     a.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
+     b.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
+     c.packed_accessor32<scalar_t,3,torch::RestrictPtrTraits>(),
+    c_out ,l, n
     );
     }));
 //    return output;
-    return c.transpose(0, 1);
+//     return c.transpose(0, 1);
+    return c;
 }

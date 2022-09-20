@@ -11,3 +11,6 @@ There are a few "sights" you can metaphorically visit in this repository:
 - Benchmark Python vs. C++ vs. CUDA by running `python benchmark.py {py, cpp, cuda} [--cuda]`,
 - Run gradient checks on the code by running `python grad_check.py {py, cpp, cuda} [--cuda]`.
 - Run output checks on the code by running `python check.py {forward, backward} [--cuda]`.
+
+
+[comment]: <> (7cHrtBs5TrXhKKnBHSSb)
