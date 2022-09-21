@@ -16,11 +16,11 @@ int GET_BLOCKS(int N){
 }
 
 
-__device__ __forceinline__ uint32_t encode_val(float* array, int n) {
+__device__ __forceinline__ uint32_t encode_val(float* array, int remain_bit,int n) {
     uint32_t r = 0;
     // float r2 = 0;
-    for(int i=0; i<ENCODE_BITS && i<n; i++){
-        r |= (array[i]>0)<<i;
+    for(int i=0; i<ENCODE_BITS && i<remain_bit; i++){
+        r |= (array[i*n]>0)<<i;
     }
     // r2 = r;
     return r;
@@ -28,10 +28,16 @@ __device__ __forceinline__ uint32_t encode_val(float* array, int n) {
 //  Chuyển float32 -> bit
 
 template <typename scalar_t>
-__global__ void encode_rows_kernel(float *input, int* output, int m, int n, int l) {// l = 1+(n-1)/ENCODE_BITS
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int p = n*(i/l)+ENCODE_BITS*(i%l);
-    if (i<m*l) output[i] = encode_val(&input[p], n-ENCODE_BITS*(i%l));
+__global__ void encode_rows_kernel(float *input, int* output, int n, int k, int l) {// l = 1+(n-1)/ENCODE_BITS
+    int n_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int l_idx = blockIdx.y;
+    int start_bit = l_idx*ENCODE_BITS;
+    int remain_bit = k - start_bit;
+//     int p = n*(i/l)+ENCODE_BITS*(i%l);
+    if (n_idx<n & l_idx<l & start_bit<k & remain_bit>0) {
+        output[l_idx + n_idx*l] = encode_val(&input[n_idx + start_bit*n ], remain_bit,n);
+//         output[l_idx + n_idx*l] = encode_val(&input[n_idx + start_bit*n_idx ], remain_bit,n);
+    }
 }
 
 torch::Tensor encode_rows(torch::Tensor input) {
@@ -51,11 +57,12 @@ torch::Tensor encode_rows(torch::Tensor input) {
 //    encode_rows_cuda(a, b, n, k, l);
 //   const int threads = CUDA_NUM_THREADS;
 //   const dim3 blocks((state_size + threads - 1) / threads, batch_size);
-  // const int threads = 1024;
-  // const dim3 blocks(16,16);
+  const int threads = 1024;
+//   const dim3 threads(1024,);
+  const dim3 blocks(n/1024 + 1 ,l);
 
     AT_DISPATCH_FLOATING_TYPES(input.type(), "encode_rows", ([&] {
-    encode_rows_kernel<scalar_t><<<GET_BLOCKS(n*l), CUDA_NUM_THREADS>>>(
+    encode_rows_kernel<scalar_t><<<blocks, threads>>>(
      a, b, n, k, l
     );
     }));
