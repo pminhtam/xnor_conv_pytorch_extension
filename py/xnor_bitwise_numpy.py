@@ -1,3 +1,6 @@
+import torch
+import torch.nn.functional as F
+# import binary_cpp
 import numpy as np
 from PIL import Image
 import tensorflow as tf
@@ -31,29 +34,31 @@ def im2col_2d(mat, fil):
 
 
 def bitpack(bin_fil,bin_col,num_repeat_,num_append_):
-  assert bin_fil.shape[-1] == bin_col.shape[-1]
-  # Bitpack filter
-  c_out , dim_k = bin_fil.shape
-  num_col , _ = bin_col.shape
-  a=bin_fil.repeat(num_repeat_,axis=1)  # (8, 36)
-  filter_pad=np.zeros((c_out,num_append_),dtype=np.uint8)
-  a_16 = np.concatenate([a,filter_pad],axis=1) # (8, 64)
-  fil_pack=np.packbits(a_16).view(np.uint16).byteswap()
-  fil_pack = fil_pack.reshape(a_16.shape[0],-1)     # one row can convert to multi number so have to convert
-  # Bitpack image
-  if num_repeat_ > 1:
-    num_col_app_ = dim_k - num_col % (dim_k)
+    # bin_fil (length , num_bits)
+    # bin_col (length , num_bitss)
+    assert bin_fil.shape[-1] == bin_col.shape[-1]
+    # Bitpack filter
+    c_out , dim_k = bin_fil.shape
+    num_col , _ = bin_col.shape
+    a=bin_fil.repeat(num_repeat_,axis=1)  # (8, 36)
+    filter_pad=np.zeros((c_out,num_append_),dtype=np.uint8)
+    a_16 = np.concatenate([a,filter_pad],axis=1) # (8, 64)
+    fil_pack=np.packbits(a_16).view(np.uint16).byteswap()
+    fil_pack = fil_pack.reshape(a_16.shape[0],-1)     # one row can convert to multi number so have to convert
+    # Bitpack image
+    if num_repeat_ > 1:
+        num_col_app_ = dim_k - num_col % (dim_k)
 
-    row_pad=np.zeros((num_col_app_,dim_k),dtype=np.uint8)
-    b=np.concatenate([bin_col,row_pad],axis=0) # pad col end(1048576 to 1048579)
-  else:
-    b = bin_col
-  b=b.reshape((-1,dim_k * num_repeat_))
-  col_pad=np.zeros((b.shape[0],num_append_),dtype=np.uint8)
-  b=np.concatenate([b,col_pad],axis=1) # pad row end(36 to 64)
-  col_pack=np.packbits(b).view(np.uint16).byteswap()
-  col_pack = col_pack.reshape(b.shape[0],-1) # one row can convert to multi number so have to convert
-  return fil_pack, col_pack
+        row_pad=np.zeros((num_col_app_,dim_k),dtype=np.uint8)
+        b=np.concatenate([bin_col,row_pad],axis=0) # pad col end(1048576 to 1048579)
+    else:
+        b = bin_col
+    b=b.reshape((-1,dim_k * num_repeat_))
+    col_pad=np.zeros((b.shape[0],num_append_),dtype=np.uint8)
+    b=np.concatenate([b,col_pad],axis=1) # pad row end(36 to 64)
+    col_pack=np.packbits(b).view(np.uint16).byteswap()
+    col_pack = col_pack.reshape(b.shape[0],-1) # one row can convert to multi number so have to convert
+    return fil_pack, col_pack
 # Classic C-Style bit-count for unpacking
 @njit
 def bit_count(n):
@@ -121,8 +126,6 @@ def xnor_bitwise_np(img_pad,fil):
     return out
 
 # print(out)
-import torch
-import torch.nn.functional as F
 
 def test_pytorch(img_pad,fil):
 

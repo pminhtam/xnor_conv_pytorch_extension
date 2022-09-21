@@ -16,8 +16,8 @@ int GET_BLOCKS(int N){
 }
 
 
-__device__ __forceinline__ uint32_t encode_val(float* array, int remain_bit,int n) {
-    uint32_t r = 0;
+__device__ __forceinline__ int encode_val(float* array, int remain_bit,int n) {
+    int r = 0;
     // float r2 = 0;
     for(int i=0; i<ENCODE_BITS && i<remain_bit; i++){
         r |= (array[i*n]>0)<<i;

@@ -60,7 +60,7 @@ torch::Tensor binary_conv2d(
    for(idx = 0; idx < batch_size; idx++){
 //    torch::Tensor col_pack = encode_rows_cpu(bin_col[0]);
        col_pack[idx] = encode_rows(bin_col[idx]);
-       std::cout << col_pack[idx].size(0) << "  ,   " << col_pack[idx].size(1) << '\n';
+//       std::cout << col_pack[idx].size(0) << "  ,   " << col_pack[idx].size(1) << '\n';
        out_tensor[idx] = binary_gemm(fil_pack, col_pack[idx], c_out,l,k,n,0,1,1);
       //  std::cout << idx ;
       // std::cout << idx << col_pack[idx] << '\n' ;
