@@ -5,13 +5,12 @@
 #include "libpopcnt.h"
 #include "matmul.h"
 
-inline uint32_t encode_val(float* array, int n) {
+inline uint32_t encode_val(float* array, int remain_bit,int n ) {
     uint32_t sign, r = 0;
 //    std::cout << "encode_val" << '\n';
 
-    for(int i=0; i<ENCODE_BIT && i<n; i++){
-        sign = array[i]>0;
-        r |= (sign<<i);
+    for(int i=0; i<ENCODE_BIT && i<remain_bit; i++){
+        r |= (array[i*n]>0)<<i;
     }
     return r;
 }
@@ -24,9 +23,14 @@ void encode_rows_cpu_kernel(float* columns, int* columns_binary, int k, int n) {
     //#pragma omp parallel for
 #pragma omp parallel for private(i)
     for (i = 0; i < n*l; i++) {
-        int p = k*(i/l)+ENCODE_BIT*(i%l);
+//        int start_bit = l_idx*ENCODE_BITS;
+        int l_idx = i%l;
+        int n_idx = i/l;
+        int start_bit = l_idx*ENCODE_BIT;
+        int remain_bit = k - start_bit;
+        int start_idx_array = n_idx + start_bit*n;
 
-        columns_binary[i] = encode_val(&columns[p], n-ENCODE_BIT*(i%l));
+        columns_binary[i] = encode_val(&columns[start_idx_array], remain_bit,n);
 //        std::cout << columns_binary[i] << '\n';
     }
 }
