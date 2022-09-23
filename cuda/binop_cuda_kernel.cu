@@ -16,11 +16,16 @@ int GET_BLOCKS(int N){
 }
 
 
-__device__ __forceinline__ int encode_val(float* array, int remain_bit,int n) {
+__device__ __forceinline__ int encode_val(float* array, int remain_bit,int n,int is_filter_transpose) {
     int r = 0;
     // float r2 = 0;
     for(int i=0; i<ENCODE_BITS && i<remain_bit; i++){
-        r |= (array[i*n]>0)<<i;
+        if (is_filter_transpose){
+            r |= (array[i]>0)<<i;
+        }
+        else{
+            r |= (array[i*n]>0)<<i;
+        }
     }
     // r2 = r;
     return r;
@@ -28,19 +33,24 @@ __device__ __forceinline__ int encode_val(float* array, int remain_bit,int n) {
 //  Chuyển float32 -> bit
 
 template <typename scalar_t>
-__global__ void encode_rows_kernel(float *input, int* output, int n, int k, int l) {// l = 1+(n-1)/ENCODE_BITS
+__global__ void encode_rows_kernel(float *input, int* output, int n, int k, int l,int is_filter_transpose) {// l = 1+(n-1)/ENCODE_BITS
     int n_idx = blockIdx.x * blockDim.x + threadIdx.x;
     int l_idx = blockIdx.y;
     int start_bit = l_idx*ENCODE_BITS;
     int remain_bit = k - start_bit;
 //     int p = n*(i/l)+ENCODE_BITS*(i%l);
     if (n_idx<n & l_idx<l & start_bit<k & remain_bit>0) {
-        output[l_idx + n_idx*l] = encode_val(&input[n_idx + start_bit*n ], remain_bit,n);
+        if (is_filter_transpose) {
+            output[l_idx + n_idx*l] = encode_val(&input[start_bit + n_idx*k ], remain_bit,n,is_filter_transpose);
 //         output[l_idx + n_idx*l] = encode_val(&input[n_idx + start_bit*n_idx ], remain_bit,n);
+        }
+        else{
+            output[l_idx + n_idx*l] = encode_val(&input[n_idx + start_bit*n ], remain_bit,n,is_filter_transpose);
+        }
     }
 }
 
-torch::Tensor encode_rows(torch::Tensor input) {
+torch::Tensor encode_rows(torch::Tensor input,int is_filter_transpose) {
     //THCUNN_assertSameGPU(state, 2, input, output);
 
 // chuyển float32 sang binary
@@ -63,7 +73,7 @@ torch::Tensor encode_rows(torch::Tensor input) {
 
     AT_DISPATCH_FLOATING_TYPES(input.type(), "encode_rows", ([&] {
     encode_rows_kernel<scalar_t><<<blocks, threads>>>(
-     a, b, n, k, l
+     a, b, n, k, l,is_filter_transpose
     );
     }));
    return output;
@@ -95,7 +105,7 @@ __global__ void binary_gemm_kernel(
     // c[c_channel][idx_int_num_local][n_local] = 1;
 // c[c_channel][idx_int_num_local][n_local] = b[0][0];
 // c[c_channel][idx_int_num_local][n_local] = b[n_local][idx_int_num_local];
-c[c_channel][idx_int_num_local][n_local] = 2*__popc( (unsigned int) a[c_channel][idx_int_num_local]^ (unsigned int) b[n_local][idx_int_num_local])-k;
+c[c_channel][idx_int_num_local][n_local] = __popc( (unsigned int) a[c_channel][idx_int_num_local]^ (unsigned int) b[n_local][idx_int_num_local]);
 // c[c_channel][idx_int_num_local][n_local] = __popc(12344);
 
 // auto rere = __popc(a[c_channel][idx_int_num_local]^b[n_local][idx_int_num_local]);
