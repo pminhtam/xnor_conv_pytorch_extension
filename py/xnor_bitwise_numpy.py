@@ -136,26 +136,26 @@ def test_pytorch(img_pad,fil):
     out = F.conv2d(torch.tensor(tensor_col), torch.tensor(tensor_fil))
     return out
 import time
+if __name__ =="__main__":
+
+    # Initialize inputs and filters randomly
+    img_pad=np.random.uniform(low=-1.0, high=1.0, size=(32,1026,1026)).astype(np.float32)
+    fil=np.random.uniform(low=-1.0, high=1.0, size=(64,32,3,3)).astype(np.float32)
 
 
-# Initialize inputs and filters randomly
-img_pad=np.random.uniform(low=-1.0, high=1.0, size=(32,1026,1026)).astype(np.float32)
-fil=np.random.uniform(low=-1.0, high=1.0, size=(64,32,3,3)).astype(np.float32)
+    start = time.time()
+    out = xnor_bitwise_np(img_pad,fil)
+    end = time.time()
+    print ("Took %f ms" % ((end - start) * 1000.0))
 
-
-start = time.time()
-out = xnor_bitwise_np(img_pad,fil)
-end = time.time()
-print ("Took %f ms" % ((end - start) * 1000.0))
-
-tensor_col = torch.tensor([img_pad])
-tensor_fil = torch.tensor(fil)
-start = time.time()
-out_torch = test_pytorch(tensor_col,tensor_fil)
-end = time.time()
-print ("Took %f ms" % ((end - start) * 1000.0))
-print(np.sum(out- out_torch.detach().numpy()))
-# import timeit
-#
-# print(timeit.timeit('xnor_bitwise_np(img_pad,fil)'))
-# print(timeit.timeit('test_pytorch(img_pad,fil)'))
+    tensor_col = torch.tensor([img_pad])
+    tensor_fil = torch.tensor(fil)
+    start = time.time()
+    out_torch = test_pytorch(tensor_col,tensor_fil)
+    end = time.time()
+    print ("Took %f ms" % ((end - start) * 1000.0))
+    print(np.sum(out- out_torch.detach().numpy()))
+    # import timeit
+    #
+    # print(timeit.timeit('xnor_bitwise_np(img_pad,fil)'))
+    # print(timeit.timeit('test_pytorch(img_pad,fil)'))
