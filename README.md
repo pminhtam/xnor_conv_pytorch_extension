@@ -2,6 +2,8 @@
 
 XNOR extension 
 
+In XNOR convolution, both the filters and the input to convolutional layers are binary. Now, by approximating the convolution operations with XNOR and bitcounting operations, we can gain massive speed-up and memory savings.
+
 xnor convolution using bitwise operation 
 
 Implement on numpy-python, Cpp and CUDA. 
@@ -52,3 +54,8 @@ out = xnor_bitwise_np(input,filter)
 [2] Rastegari, Mohammad, Vicente Ordonez, Joseph Redmon, and Ali Farhadi. "Xnor-net: Imagenet classification using binary convolutional neural networks." In European conference on computer vision, pp. 525-542. Springer, Cham, 2016.
 
 [3] https://github.com/cooooorn/Pytorch-XNOR-Net
+
+[4] https://github.com/anilsathyan7/ConvAcc
+
+[5][Binarized Neural Networks: Training Deep Neural Networks with Weights and Activations Constrained to +1 or -1](https://arxiv.org/pdf/1602.02830.pdf)
+
