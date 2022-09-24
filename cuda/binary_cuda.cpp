@@ -50,7 +50,7 @@ torch::Tensor binary_conv2d(
 
     torch::Tensor fil_pack = torch::zeros(torch::IntArrayRef({c_out, l}),torch::TensorOptions()
                     .dtype(torch::kInt32).device(torch::kCUDA, 0));
-    torch::Tensor out_tensor = torch::zeros(torch::IntArrayRef({batch_size,c_out,l,n}),torch::TensorOptions()
+    torch::Tensor out_tensor = torch::zeros(torch::IntArrayRef({batch_size,c_out,n}),torch::TensorOptions()
                     .dtype(torch::kInt32).device(torch::kCUDA, 0));
     fil_pack = encode_rows(bin_fil,1);
     // torch::Tensor col_pack = torch::zeros(torch::IntArrayRef({batch_size,n,l}));

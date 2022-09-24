@@ -98,7 +98,6 @@ __global__ void binary_gemm_kernel(
   // column index
   const int idx_int_num_local = threadIdx.y;
   const int c_channel =  blockIdx.y;
-    int idx = 0;
   if (n_local < n & idx_int_num_local < l & c_channel < c_out){
     //  b[idx_int_num_local][n_local] = 1;
       // auto b_element = b[n_local][idx_int_num_local];
@@ -130,6 +129,26 @@ c[c_channel][idx_int_num_local][n_local] = __popc( (unsigned int) a[c_channel][i
   }
 }
 
+template <typename scalar_t>
+__global__ void get_final_result_kernel(
+            const torch::PackedTensorAccessor32<scalar_t,3,torch::RestrictPtrTraits> output_bin,
+            torch::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> output_bin_final,
+            int c_out, int n, int l,int k) {// l = 1+(n-1)/ENCODE_BITS
+  //batch index
+  const int n_local = threadIdx.x + blockIdx.x * blockDim.x;
+  // column index
+  const int c_channel =  blockIdx.y;
+    int idx_l = 0;
+  if (n_local < n & c_channel < c_out){
+        for (idx_l = 0; idx_l <l;idx_l++){
+            output_bin_final[c_channel][n_local] += output_bin[c_channel][idx_l][n_local];
+            // output_bin_final[c_channel][n_local] += 1;
+        }
+        output_bin_final[c_channel][n_local] = k-2*output_bin_final[c_channel][n_local];
+        // output_bin_final[c_channel][n_local] = 1;
+    }
+}
+
 torch::Tensor binary_gemm(torch::Tensor a, torch::Tensor b,  int c_out, int l, int k, int n, int transb, int alpha, int beta){
 
 //     b : columns_binary
@@ -152,7 +171,7 @@ torch::Tensor binary_gemm(torch::Tensor a, torch::Tensor b,  int c_out, int l, i
     // std::cout << b.size(0) << "  ,   " << b.size(1) << '\n';
     // std::cout << "b[0][0] : " << b[0][0] << '\n';
     // std::cout << "a[0][0] : " << a[0][0] << '\n';
-    AT_DISPATCH_ALL_TYPES(b.type(), "binary_gemm", ([&] {
+    AT_DISPATCH_ALL_TYPES(b.type(), "binary_gemm binary_gemm_kernel", ([&] {
     binary_gemm_kernel<scalar_t><<<blocks, threads>>>(
      a.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
      b.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
@@ -160,7 +179,18 @@ torch::Tensor binary_gemm(torch::Tensor a, torch::Tensor b,  int c_out, int l, i
     c_out ,l,k, n
     );
     }));
+
+    const dim3 threads2(1024);
+    const dim3 blocks2(n/1024+1, c_out);
+    torch::Tensor d = torch::zeros(torch::IntArrayRef({c_out,n}),torch::TensorOptions().dtype(torch::kInt32).device(torch::kCUDA, 0));
+    AT_DISPATCH_ALL_TYPES(b.type(), "binary_gemm get_final_result_kernel", ([&] {
+    get_final_result_kernel<scalar_t><<<blocks2, threads2>>>(
+     c.packed_accessor32<scalar_t,3,torch::RestrictPtrTraits>(),
+     d.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
+    c_out ,n, l,k
+    );
+    }));
 //    return output;
 //     return c.transpose(0, 1);
-    return c;
+    return d;
 }
