@@ -4,6 +4,7 @@
 //#include <iostream>
 #include "libpopcnt.h"
 #include "matmul.h"
+#define MASK(a) ( (a) + ( -(a) & -((0)>(a)) ) )
 
 inline uint32_t encode_val(float* array, int remain_bit,int n ,int is_filter_transpose) {
     uint32_t sign, r = 0;
@@ -71,23 +72,45 @@ torch::Tensor binary_gemm_cpu(torch::Tensor a, torch::Tensor b, int c_out, int k
 //    if (c->nDimension != 2 || c->size[0]*c->size[1] < m*k) {
 //        THFloatTensor_resize2d(c, m, k);
 //    }
-    auto A = a.data_ptr<int>();
-    auto B = b.data_ptr<int>();
-    torch::Tensor c = torch::zeros(torch::IntArrayRef({c_out,n}),torch::TensorOptions().dtype(torch::kFloat));
-    torch::Tensor alphas = torch::ones(torch::IntArrayRef({c_out,n}),torch::TensorOptions().dtype(torch::kFloat));
-    auto C = c.data_ptr<float>();
-    auto D = alphas.data_ptr<float>();
-//    int l = 1 + (k-1) / ENCODE_BIT, brow = transb? 1:n, bcol = transb? l:1;
-//    dgemm_nn(c_out, n, k, A, l, 1, B, brow,s bcol, C, k, 1, beta, alpha, D);
-//    int a_s1 =  a.size(0);
-//    std::cout << a_s1<< '\n';
-//    std::cout << a.size(0)<< '\n';
-//    std::cout << a.size(1)<< '\n';
-//    dgemm_nn(c_out, n, k, A, l, 1, B, 1, l, C, k, 1, beta, alpha, D);   // wrong big
-//    dgemm_nn(c_out, n, k, A, l, 1, B, l, 1, C, k, 1, beta, alpha, D); // wrong big
-//    dgemm_nn(c_out, n, k, A, 1, l, B, 1, l, C, 1, k, beta, alpha, D); // wrong
-//    dgemm_nn(c_out, n, k, A, 1, l, B, l, 1, C, 1, k, beta, alpha, D); // wrong
-    dgemm_nn(c_out, n, k, A, l, 1, B, l, 1, C, 1, k, beta, alpha, D); // wrong
+//    auto A = a.data_ptr<int>();
+//    auto B = b.data_ptr<int>();
+    torch::Tensor c = torch::zeros(torch::IntArrayRef({c_out,n}),torch::TensorOptions().dtype(torch::kInt32));
+//    torch::Tensor alphas = torch::ones(torch::IntArrayRef({c_out,n}),torch::TensorOptions().dtype(torch::kFloat));
+//    auto C = c.data_ptr<float>();
+    std::cout<< c.size(0)<<"   "<<c.size(1) <<"\n";
+       int n_local = 0;
+  // column index
+        int l_idx = 0;
+        int c_channel =  0;
+        auto C = c.data_ptr<int>();
+    #pragma omp parallel for private(n_local)
+    for (n_local=0;n_local<n;n_local++){
+        #pragma omp parallel for private(c_channel)
+        for ( c_channel=0;c_channel<c_out;c_channel++){
+            for (l_idx=0;l_idx<l;l_idx++){
+                int filter_idx = a[c_channel][l_idx].item().to<int>();
+                int data_idx = b[n_local][l_idx].item().to<int>();
+//                c[c_channel][n_local] += popcnt32( MASK(filter_idx ^ data_idx))<<1;
+//                std::cout << filter_idx << "   " << data_idx << '\n';
+//                C[n_local*n + c_channel] += popcnt32( MASK(filter_idx ^ data_idx))<<1;
+                C[n_local + n*c_channel] += popcnt32(filter_idx ^ data_idx);
+//                C[n_local*c_out + c_channel] += popcnt32(filter_idx ^ data_idx);
+//                C[n_local + n*c_channel] += popcnt32(filter_idx ^ data_idx);
+//                C[n_local*c_out + c_channel]  = 1;
+            }
+        }
+    }
+    #pragma omp parallel for
+    for (n_local=0;n_local<n;n_local++){
+        #pragma omp parallel for
+        for ( c_channel=0;c_channel<c_out;c_channel++){
+
+                C[n_local + n*c_channel] = k - 2*C[n_local + n*c_channel];
+//                C[n_local*c_out + c_channel] = k - 2*C[n_local*c_out + c_channel];
+//                C[n_local*c_out + c_channel]  = 1;
+        }
+    }
+//    dgemm_nn(c_out, n, k, A, l, 1, B, l, 1, C, 1, k, beta, alpha, D); // wrong
     // ??????????
     return c;
 
@@ -111,7 +134,7 @@ static torch::Tensor Bin_SpatialConvolutionMM_updateOutput_frame(
     return output2d;
 }
 
-
+#pragma omp parallel
 torch::Tensor binary_conv2d(
     torch::Tensor input,
     torch::Tensor weights,
@@ -148,14 +171,14 @@ torch::Tensor binary_conv2d(
 
     torch::Tensor out_tensor = torch::zeros(torch::IntArrayRef({batch_size,c_out,n}));
 
-//#pragma omp parallel for private(idx)
-//    for(idx = 0; idx < batch_size; idx++){
-//        out_tensor[idx] = Bin_SpatialConvolutionMM_updateOutput_frame(weights,bias,col_pack[idx],
-//         c_in, k1,k2,n, c_out,l);
-//    }
+#pragma omp parallel for private(idx)
+    for(idx = 0; idx < batch_size; idx++){
+        out_tensor[idx] = Bin_SpatialConvolutionMM_updateOutput_frame(fil_pack,bias,col_pack[idx],
+         c_in, k1,k2,n, c_out,l);
+    }
 //    return col_pack;
-    return fil_pack;
-//    return out_tensor;
+//    return fil_pack;
+    return out_tensor;
 //    return bin_col;
 //    return fil_2;
 }

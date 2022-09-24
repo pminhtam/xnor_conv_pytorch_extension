@@ -281,18 +281,18 @@ dgemm_nn(int            m,
     }
 
     //#pragma omp parallel for schedule(dynamic,1) collapse(2)
-    for(i=0; i<m; i++){
-        for(j=0; j<n; j++){
-            C[i*n+j]+=kk;
-        }
-    }
-    if(alpha){
-        for(i=0; i<m; i++){
-            for(j=0; j<n; j++){
-                C[i*n+j]*=alphas[i];
-            }
-        }
-    }
+//    for(i=0; i<m; i++){
+//        for(j=0; j<n; j++){
+//            C[i*n+j]+=kk;
+//        }
+//    }
+//    if(alpha){
+//        for(i=0; i<m; i++){
+//            for(j=0; j<n; j++){
+//                C[i*n+j]*=alphas[i];
+//            }
+//        }
+//    }
 }
 
 #endif /* MATMUL_H */
