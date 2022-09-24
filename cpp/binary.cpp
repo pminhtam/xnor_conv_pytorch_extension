@@ -5,17 +5,22 @@
 #include "libpopcnt.h"
 #include "matmul.h"
 
-inline uint32_t encode_val(float* array, int remain_bit,int n ) {
+inline uint32_t encode_val(float* array, int remain_bit,int n ,int is_filter_transpose) {
     uint32_t sign, r = 0;
 //    std::cout << "encode_val" << '\n';
 
     for(int i=0; i<ENCODE_BIT && i<remain_bit; i++){
-        r |= (array[i*n]>0)<<i;
+        if (is_filter_transpose){
+            r |= (array[i]>0)<<i;
+        }
+        else{
+            r |= (array[i*n]>0)<<i;
+        }
     }
     return r;
 }
 
-void encode_rows_cpu_kernel(float* columns, int* columns_binary, int k, int n) {
+void encode_rows_cpu_kernel(float* columns, int* columns_binary, int k, int n,int is_filter_transpose) {
 //Chuyển float columns sang mảng binary ở columns_binary
     int i, l = 1+(k-1)/ENCODE_BIT;
 //    std::cout << "encode_rows_cpu_kernel" << '\n';
@@ -28,14 +33,19 @@ void encode_rows_cpu_kernel(float* columns, int* columns_binary, int k, int n) {
         int n_idx = i/l;
         int start_bit = l_idx*ENCODE_BIT;
         int remain_bit = k - start_bit;
-        int start_idx_array = n_idx + start_bit*n;
-
-        columns_binary[i] = encode_val(&columns[start_idx_array], remain_bit,n);
+        int start_idx_array = 0;
+        if (is_filter_transpose){
+            start_idx_array = n_idx*k + start_bit;
+        }
+        else{
+            start_idx_array = n_idx + start_bit*n;
+        }
+        columns_binary[i] = encode_val(&columns[start_idx_array], remain_bit,n,is_filter_transpose);
 //        std::cout << columns_binary[i] << '\n';
     }
 }
 
-torch::Tensor encode_rows_cpu(torch::Tensor input) {
+torch::Tensor encode_rows_cpu(torch::Tensor input,int is_filter_transpose) {
 // chuyển float32 sang binary
     int n = input.size(0);  // = h*w
     int k = input.size(1);  // = c*k1*k2
@@ -49,7 +59,7 @@ torch::Tensor encode_rows_cpu(torch::Tensor input) {
     auto b = output.data_ptr<int>();
 //    torch::Tensor a = input;
 //    torch::Tensor b = output;
-    encode_rows_cpu_kernel(a, b, k, n);
+    encode_rows_cpu_kernel(a, b, k, n,is_filter_transpose);
 
 //    std::cout << "encode_rows_cpu output :  " << output << '\n';
     return output;
@@ -128,18 +138,24 @@ torch::Tensor binary_conv2d(
 #pragma omp parallel for private(idx)
     for(idx = 0; idx < batch_size; idx++){
 //    torch::Tensor col_pack = encode_rows_cpu(bin_col[0]);
-        col_pack[idx] = encode_rows_cpu(bin_col[idx]);
+        col_pack[idx] = encode_rows_cpu(bin_col[idx],0);
     }
+    torch::Tensor fil_pack = torch::zeros(torch::IntArrayRef({c_out, l}),torch::TensorOptions()
+                    .dtype(torch::kInt32));
+    fil_pack = encode_rows_cpu(bin_fil,1);
+
 //    torch::Tensor out_tensor = torch::zeros_like(input);
+
     torch::Tensor out_tensor = torch::zeros(torch::IntArrayRef({batch_size,c_out,n}));
 
-#pragma omp parallel for private(idx)
-    for(idx = 0; idx < batch_size; idx++){
-        out_tensor[idx] = Bin_SpatialConvolutionMM_updateOutput_frame(weights,bias,col_pack[idx],
-         c_in, k1,k2,n, c_out,l);
-    }
+//#pragma omp parallel for private(idx)
+//    for(idx = 0; idx < batch_size; idx++){
+//        out_tensor[idx] = Bin_SpatialConvolutionMM_updateOutput_frame(weights,bias,col_pack[idx],
+//         c_in, k1,k2,n, c_out,l);
+//    }
 //    return col_pack;
-    return out_tensor;
+    return fil_pack;
+//    return out_tensor;
 //    return bin_col;
 //    return fil_2;
 }
