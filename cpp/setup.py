@@ -7,7 +7,7 @@ from torch.utils.cpp_extension import BuildExtension, CppExtension
 #     flag for flag in opt.split() if flag != '-Wstrict-prototypes'
 # )
 
-include_dirs = ['libpopcnt.h','matmul.h']
+include_dirs = ['libpopcnt.h','binary_kernel.h']
 setup(
     name='binary_cpp',
     version='0.1',
