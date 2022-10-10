@@ -1,5 +1,9 @@
 import torch
-import binary_cuda
+# import binary_cuda
+from torch.utils.cpp_extension import load
+binary_cuda = load(
+    'binary_cuda', ['binary_cuda.cpp','binop_cuda_kernel.cu'], verbose=True)
+
 # h = torch.randn(32,32)
 # C = torch.randn(32,32)
 import torch.nn.functional as F
@@ -26,7 +30,10 @@ tensor_fil[fil <= 0] = 0
 # print(bias)
 
 # re = binary_cpp.binary_conv2d(img_pad,fil,bias)
-re = binary_cuda.binary_conv2d_cuda(tensor_col,tensor_fil,bias)
+import time
+begin = time.time()
+re = binary_cuda.binary_conv2d_cuda(tensor_col,tensor_fil)
+print("xnor ", time.time()-begin)
 # re = binary_cpp.popcnt32(124)
 # print(re[0][0])
 # print(re[0])
@@ -34,11 +41,14 @@ re = binary_cuda.binary_conv2d_cuda(tensor_col,tensor_fil,bias)
 # tensor_fil = tensor_fil.type(torch.float)
 tensor_col[img_pad == 0] = -1
 tensor_fil[fil == 0] = -1
-out = F.conv2d(torch.tensor(tensor_col), torch.tensor(tensor_fil))
-print(out)
+with torch.no_grad():
+    begin = time.time()
+    out = F.conv2d(tensor_col, tensor_fil)
+    print("pytorch ", time.time()-begin)
+# print(out)
 
 
 re = re.reshape(out.shape)
-print(re)
+# print(re)
 # print(re[0,:11,:].cpu().numpy())
-print(re.shape)
+# print(re.shape)

@@ -112,8 +112,8 @@ torch::Tensor binary_gemm(torch::Tensor a, torch::Tensor b,  int c_out, int l, i
 
 //  k số hàng
 // n số cột
-
-    const dim3 threads(256, l/1+1);
+//     int num_thread = int(1024/(l+1);
+    const dim3 threads((int) 1024/(l+1) , l/1+1);
     const dim3 blocks(n/256+1, c_out);
     torch::Tensor c = torch::zeros(torch::IntArrayRef({c_out,l,n}),torch::TensorOptions().dtype(torch::kInt32).device(torch::kCUDA, 0));
     AT_DISPATCH_ALL_TYPES(b.type(), "binary_gemm binary_gemm_kernel", ([&] {
