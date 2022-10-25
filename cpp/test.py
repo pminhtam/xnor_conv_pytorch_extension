@@ -4,7 +4,7 @@ import binary_cpp
 # C = torch.randn(32,32)
 import torch.nn.functional as F
 torch.manual_seed(0)
-
+import time
 # img_pad = torch.randn(3,32,1026,1026)   # batch , c, h,w,
 img_pad = torch.randn(1,3,1026,1026)   # batch , c, h,w,
 # fil = torch.randn(64,32,3,3) # c_out, c_in, k1,k2
@@ -23,13 +23,19 @@ tensor_fil[fil <= 0] = 0
 # bias = bias.type(torch.int)
 # print(bias)
 # re = binary_cpp.binary_conv2d(img_pad,fil,bias)
+begin = time.time()
 re = binary_cpp.binary_conv2d(tensor_col,tensor_fil,bias)
+end = time.time()
+print("Xnor : ",end-begin)
 # re = binary_cpp.popcnt32(124)
 
 tensor_fil = tensor_fil.type(torch.float)
 tensor_col[img_pad == 0] = -1
 tensor_fil[fil == 0] = -1
+begin = time.time()
 out = F.conv2d(torch.tensor(tensor_col), torch.tensor(tensor_fil))
+end = time.time()
+print("F.conv2d : ", end - begin)
 print(out)
 
 re =re.reshape(out.shape)

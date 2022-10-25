@@ -24,7 +24,7 @@ inline uint32_t encode_val(float* array, int remain_bit,int n ,int is_filter_tra
 void encode_rows_cpu_kernel(float* columns, int* columns_binary, int k, int n,int is_filter_transpose) {
 //Chuyển float columns sang mảng binary ở columns_binary
     int i, l = 1+(k-1)/ENCODE_BIT;
-#pragma omp parallel for private(i)
+//#pragma omp parallel for private(i)
     for (i = 0; i < n*l; i++) {
         int l_idx = i%l;
         int n_idx = i/l;
@@ -61,24 +61,27 @@ torch::Tensor binary_gemm_cpu(torch::Tensor a, torch::Tensor b, int c_out, int k
         int l_idx = 0;
         int c_channel =  0;
         auto C = c.data_ptr<int>();
-    #pragma omp parallel for private(n_local)
-    for (n_local=0;n_local<n;n_local++){
-        #pragma omp parallel for private(c_channel)
-        for ( c_channel=0;c_channel<c_out;c_channel++){
-            for (l_idx=0;l_idx<l;l_idx++){
+//    #pragma omp parallel for private(n_local)
+at::parallel_for(0, n,1, [&](int64_t start, int64_t end) {
+    for (int n_local=start;n_local<end;n_local++){
+//        #pragma omp parallel for private(c_channel)
+        for ( int c_channel=0;c_channel<c_out;c_channel++){
+            for (int l_idx=0;l_idx<l;l_idx++){
                 int filter_idx = a[c_channel][l_idx].item().to<int>();
                 int data_idx = b[n_local][l_idx].item().to<int>();
                 C[n_local + n*c_channel] += popcnt32(filter_idx ^ data_idx);
             }
         }
     }
-    #pragma omp parallel for
-    for (n_local=0;n_local<n;n_local++){
-        #pragma omp parallel for
-        for ( c_channel=0;c_channel<c_out;c_channel++){
+    });
+//    #pragma omp parallel for
+at::parallel_for(0, n,1, [&](int64_t start, int64_t end) {
+    for (int n_local=start;n_local<end;n_local++){//        #pragma omp parallel for
+        for (int c_channel=0;c_channel<c_out;c_channel++){
                 C[n_local + n*c_channel] = k - 2*C[n_local + n*c_channel];
         }
     }
+    });
     return c;
 }
 

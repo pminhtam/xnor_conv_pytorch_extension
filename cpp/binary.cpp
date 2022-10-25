@@ -1,7 +1,8 @@
 #include <torch/extension.h>
 #include "binary_kernel.h"
-
-#pragma omp parallel
+#include <ATen/ATen.h>
+#include <ATen/Parallel.h>
+//#pragma omp parallel
 torch::Tensor binary_conv2d(
     torch::Tensor input,
     torch::Tensor weights,
@@ -23,7 +24,7 @@ torch::Tensor binary_conv2d(
     int l = 1+(k-1)/ENCODE_BIT;
     int idx;
     torch::Tensor col_pack = torch::zeros(torch::IntArrayRef({batch_size,n,l}),torch::TensorOptions().dtype(torch::kInt32));
-#pragma omp parallel for private(idx)
+//#pragma omp parallel for private(idx)
     for(idx = 0; idx < batch_size; idx++){
         col_pack[idx] = encode_rows_cpu(bin_col[idx],0);
     }
@@ -32,7 +33,7 @@ torch::Tensor binary_conv2d(
     fil_pack = encode_rows_cpu(bin_fil,1);
     torch::Tensor out_tensor = torch::zeros(torch::IntArrayRef({batch_size,c_out,n}));
 
-#pragma omp parallel for private(idx)
+//#pragma omp parallel for private(idx)
     for(idx = 0; idx < batch_size; idx++){
         out_tensor[idx] = Bin_SpatialConvolutionMM_updateOutput_frame(fil_pack,bias,col_pack[idx],
          c_in, k1,k2,n, c_out,l);

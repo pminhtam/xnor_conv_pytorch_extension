@@ -59,3 +59,6 @@ out = xnor_bitwise_np(input,filter)
 
 [5][Binarized Neural Networks: Training Deep Neural Networks with Weights and Activations Constrained to +1 or -1](https://arxiv.org/pdf/1602.02830.pdf)
 
+[6] https://github.com/pytorch/pytorch/blob/e9902358df14dc4809e4f50b12088a5200a1862d/aten/src/ATen/native/ConvolutionMM2d.cpp
+
+[7] https://github.com/pytorch/pytorch/blob/a5f01846c2bae0d78a5c0cd74ced20a07b8ef961/aten/src/THCUNN/generic/SpatialConvolutionMM.cu
